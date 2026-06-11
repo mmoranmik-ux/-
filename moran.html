@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="he">
+
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<title>Kosher Wolt FULL</title>
+
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+
+<style>
+
+
+/* 🌌 BACKGROUND */
+body{
+margin:0;
+font-family:Arial;
+direction:rtl;
+color:white;
+background:#0b1020;
+overflow-x:hidden;
+}
+
+
+body::before{
+content:"";
+position:fixed;
+inset:0;
+background:linear-gradient(120deg,#0ea5e9,#8b5cf6,#22c55e,#ec4899);
+background-size:300% 300%;
+animation:move 12s ease infinite;
+opacity:0.25;
+z-index:-2;
+}
+
+
+@keyframes move{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+
+
+body::after{
+content:"";
+position:fixed;
+inset:0;
+background:
+radial-gradient(circle at 20% 30%,rgba(0,194,168,0.25),transparent 40%),
+radial-gradient(circle at 80% 20%,rgba(139,92,246,0.25),transparent 40%),
+radial-gradient(circle at 50% 80%,rgba(236,72,153,0.2),transparent 40%);
+z-index:-1;
+animation:float 8s ease-in-out infinite alternate;
+}
+
+
+@keyframes float{
+from{transform:translateY(0px);}
+to{transform:translateY(-20px);}
+}
+
+
+/* HEADER */
+.header{
+background:rgba(255,255,255,0.06);
+backdrop-filter:blur(20px);
+padding:15px;
+position:sticky;
+top:0;
+z-index:10;
+}
+
+
+.title{
+font-size:20px;
+font-weight:bold;
+}
+
+
+.search{
+width:100%;
+margin-top:10px;
+padding:12px;
+border-radius:12px;
+border:none;
+background:rgba(255,255,255,0.08);
+color:white;
+outline:none;
+}
+
+
+/* CATEGORIES */
+.categories{
+display:flex;
+gap:10px;
+overflow-x:auto;
+padding:10px;
+}
+
+
+.cat{
+padding:8px 14px;
+border-radius:999px;
+background:rgba(255,255,255,0.1);
+cursor:pointer;
+white-space:nowrap;
+}
+
+
+.cat.active{
+background:#00c2a8;
+}
+
+
+/* MAP */
+#map{
+height:220px;
+margin:10px;
+border-radius:14px;
+}
+
+
+/* LIST */
+.list{
+padding:10px;
+display:grid;
+gap:12px;
+}
+
+
+/* CARD */
+.card{
+background:rgba(255,255,255,0.08);
+backdrop-filter:blur(15px);
+border-radius:16px;
+overflow:hidden;
+transition:0.2s;
+border:1px solid rgba(255,255,255,0.1);
+}
+
+
+.card:hover{transform:scale(1.02);}
+
+
+.img{
+width:100%;
+height:140px;
+object-fit:cover;
+}
+
+
+.content{padding:12px;}
+
+
+.name{
+font-size:18px;
+font-weight:bold;
+}
+
+
+.row{
+display:flex;
+justify-content:space-between;
+font-size:13px;
+opacity:0.85;
+margin-top:5px;
+}
+
+
+.badge{
+display:inline-block;
+padding:5px 10px;
+border-radius:999px;
+font-size:12px;
+margin-left:5px;
+background:#8b5cf6;
+}
+
+
+.btns{
+display:flex;
+gap:10px;
+margin-top:10px;
+}
+
+
+button{
+flex:1;
+padding:10px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+font-weight:bold;
+}
+
+
+.waze{background:#0ea5e9;color:white;}
+.google{background:#22c55e;color:white;}
+
+
+.small{
+font-size:12px;
+opacity:0.7;
+margin-top:5px;
+}
+
+
+</style>
+
+
+</head>
+
+
+<body>
+
+
+<div class="header">
+<div class="title">🍽️ Kosher Wolt FULL</div>
+<input class="search" id="search" oninput="render()" placeholder="חפש מסעדה...">
+</div>
+
+
+<div class="categories">
+<div class="cat active" onclick="setType('')">הכל</div>
+<div class="cat" onclick="setType('pizza')">🍕 פיצה</div>
+<div class="cat" onclick="setType('burger')">🍔 בורגר</div>
+<div class="cat" onclick="setType('sushi')">🍣 סושי</div>
+<div class="cat" onclick="setType('shawarma')">🥙 שווארמה</div>
+<div class="cat" onclick="setType('pasta')">🍝 פסטה</div>
+</div>
+
+
+<div id="map"></div>
+<div class="list" id="list"></div>
+
+
+<script>
+
+
+/* 📍 מיקום */
+let userLat=32.015;
+let userLon=34.78;
+
+
+/* 🗺️ מפה */
+let map=L.map("map").setView([userLat,userLon],13);
+
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+
+L.marker([userLat,userLon]).addTo(map);
+
+
+/* 🍽️ נתונים */
+const allData = {
+
+
+pizza:[
+{name:"פיצה שמש",lat:32.015,lon:34.78,rating:4.5},
+{name:"פנינת הפיצה",lat:32.018,lon:34.783,rating:4.9},
+{name:"פיצה עגבניה",lat:32.017,lon:34.782,rating:4.7},
+{name:"דומינוס",lat:32.02,lon:34.775,rating:4.6},
+{name:"פיצה האט",lat:31.97,lon:34.79,rating:4.4},
+{name:"פיצה פרגו",lat:32.012,lon:34.776,rating:4.8},
+{name:"פיצה רומא",lat:32.011,lon:34.774,rating:4.7},
+{name:"פיצה פריז",lat:32.019,lon:34.781,rating:4.6},
+{name:"פיצה העיר",lat:32.016,lon:34.779,rating:4.5},
+{name:"פיצה אקספרס",lat:32.013,lon:34.773,rating:4.4},
+{name:"פיצה בר",lat:32.022,lon:34.783,rating:4.7},
+{name:"פיצה ניו יורק",lat:32.025,lon:34.787,rating:4.9},
+{name:"פיצה סיטי",lat:32.026,lon:34.784,rating:4.6},
+{name:"פיצה פמילי",lat:32.027,lon:34.782,rating:4.5},
+{name:"פיצה שכונתית",lat:32.021,lon:34.779,rating:4.4},
+{name:"פיצה גלקסי",lat:32.023,lon:34.778,rating:4.8},
+{name:"פיצה בום",lat:32.024,lon:34.776,rating:4.7},
+{name:"פיצה איטליאנו",lat:32.017,lon:34.774,rating:4.6},
+{name:"פיצה דלוקס",lat:32.018,lon:34.775,rating:4.5},
+{name:"פיצה פאן",lat:32.019,lon:34.777,rating:4.4},
+{name:"פיצה קלאב",lat:32.02,lon:34.779,rating:4.6},
+{name:"פיצה חמה",lat:32.014,lon:34.781,rating:4.5},
+{name:"פיצה הבית",lat:32.013,lon:34.782,rating:4.8},
+{name:"פיצה פלוס",lat:32.012,lon:34.783,rating:4.7},
+{name:"פיצה ספיישל",lat:32.011,lon:34.784,rating:4.9},
+{name:"פיצה סטאר",lat:32.01,lon:34.785,rating:4.6},
+{name:"פיצה אבן גבירול",lat:32.009,lon:34.786,rating:4.5},
+{name:"פיצה קיסר",lat:32.008,lon:34.787,rating:4.7},
+{name:"פיצה גורמה",lat:32.007,lon:34.788,rating:4.8},
+{name:"פיצה העיר העתיקה",lat:32.006,lon:34.789,rating:4.6}
+],
+
+
+burger:[
+{name:"BBB ראשון",lat:31.97,lon:34.79,rating:4.7},
+{name:"ממפיס",lat:31.972,lon:34.798,rating:4.6},
+{name:"בלאק",lat:32.01,lon:34.77,rating:4.7},
+{name:"אמריקה בורגר",lat:32.013,lon:34.776,rating:4.8},
+{name:"בורגר קינג",lat:32.02,lon:34.78,rating:4.5},
+{name:"מקדונלדס",lat:32.021,lon:34.782,rating:4.8},
+{name:"אגאדיר",lat:32.018,lon:34.779,rating:4.7},
+{name:"בורגרס בר",lat:32.017,lon:34.778,rating:4.6},
+{name:"מיט בר",lat:32.016,lon:34.777,rating:4.9},
+{name:"הקצביה בורגר",lat:32.015,lon:34.776,rating:4.5},
+{name:"צ'יזי בורגר",lat:32.014,lon:34.775,rating:4.4},
+{name:"ביג בורגר",lat:32.013,lon:34.774,rating:4.6},
+{name:"בורגר האוס",lat:32.012,lon:34.773,rating:4.7},
+{name:"בורגר אקספרס",lat:32.011,lon:34.772,rating:4.5},
+{name:"גריל בר",lat:32.01,lon:34.771,rating:4.8},
+{name:"ניו יורק בורגר",lat:32.009,lon:34.77,rating:4.7},
+{name:"סמאש בורגר",lat:32.008,lon:34.769,rating:4.6},
+{name:"בורגר העיר",lat:32.007,lon:34.768,rating:4.5},
+{name:"פרימיום בורגר",lat:32.006,lon:34.767,rating:4.9},
+{name:"בורגר טאון",lat:32.005,lon:34.766,rating:4.6},
+{name:"בורגר קלאב",lat:32.004,lon:34.765,rating:4.7},
+{name:"בורגר פלוס",lat:32.003,lon:34.764,rating:4.5},
+{name:"בורגר שף",lat:32.002,lon:34.763,rating:4.8},
+{name:"בורגר XL",lat:32.001,lon:34.762,rating:4.7},
+{name:"גריל מאסטר",lat:32.022,lon:34.781,rating:4.9},
+{name:"בורגר בום",lat:32.023,lon:34.782,rating:4.6},
+{name:"בורגר סטיישן",lat:32.024,lon:34.783,rating:4.5},
+{name:"בורגר גורמה",lat:32.025,lon:34.784,rating:4.8},
+{name:"בורגר וייב",lat:32.026,lon:34.785,rating:4.7},
+{name:"בורגר פקטורי",lat:32.027,lon:34.786,rating:4.6}
+],
+
+
+sushi:[
+{name:"אושי אושי",lat:32.013,lon:34.776,rating:4.8},
+{name:"גפניקה",lat:32.016,lon:34.777,rating:4.5},
+{name:"טוקיו סושי",lat:32.015,lon:34.78,rating:4.7},
+{name:"יאמאטו",lat:32.02,lon:34.784,rating:4.6},
+{name:"סושי ליין",lat:32.018,lon:34.781,rating:4.6},
+{name:"סושי בר",lat:32.017,lon:34.78,rating:4.7},
+{name:"סושי טיים",lat:32.016,lon:34.779,rating:4.5},
+{name:"סושי סיטי",lat:32.015,lon:34.778,rating:4.6},
+{name:"קיוטו סושי",lat:32.014,lon:34.777,rating:4.8},
+{name:"סמוראי סושי",lat:32.013,lon:34.776,rating:4.9},
+{name:"סושי גורמה",lat:32.012,lon:34.775,rating:4.7},
+{name:"סושי בוקס",lat:32.011,lon:34.774,rating:4.5},
+{name:"סושי אקספרס",lat:32.01,lon:34.773,rating:4.6},
+{name:"נינג'ה סושי",lat:32.009,lon:34.772,rating:4.8},
+{name:"סושי מאסטר",lat:32.008,lon:34.771,rating:4.7},
+{name:"סושי פוינט",lat:32.007,lon:34.77,rating:4.5},
+{name:"סושי פלוס",lat:32.006,lon:34.769,rating:4.6},
+{name:"סושי פארק",lat:32.005,lon:34.768,rating:4.8},
+{name:"סושי הבית",lat:32.004,lon:34.767,rating:4.9},
+{name:"סושי ווק",lat:32.003,lon:34.766,rating:4.5},
+{name:"סושי פאן",lat:32.002,lon:34.765,rating:4.7},
+{name:"סושי שף",lat:32.001,lon:34.764,rating:4.6},
+{name:"סושי וייב",lat:32.022,lon:34.783,rating:4.8},
+{name:"סושי אושן",lat:32.023,lon:34.784,rating:4.7},
+{name:"סושי דרים",lat:32.024,lon:34.785,rating:4.6},
+{name:"סושי קלאב",lat:32.025,lon:34.786,rating:4.5},
+{name:"סושי סטאר",lat:32.026,lon:34.787,rating:4.8},
+{name:"סושי טוקיו",lat:32.027,lon:34.788,rating:4.9},
+{name:"סושי פריים",lat:32.028,lon:34.789,rating:4.7},
+{name:"סושי דלוקס",lat:32.029,lon:34.79,rating:4.6}
+],
+
+
+shawarma:[
+{name:"מיטוס ת״א",lat:32.074,lon:34.786,rating:4.9},
+{name:"שווארמה שמש",lat:32.015,lon:34.78,rating:4.6},
+{name:"דבוש",lat:32.018,lon:34.783,rating:4.7},
+{name:"אבו חילווה",lat:32.017,lon:34.782,rating:4.8},
+{name:"שווארמה חן",lat:32.02,lon:34.775,rating:4.5},
+{name:"שווארמה העיר",lat:32.019,lon:34.776,rating:4.7},
+{name:"שווארמה טורקית",lat:32.018,lon:34.777,rating:4.6},
+{name:"שווארמה פרימיום",lat:32.017,lon:34.778,rating:4.8},
+{name:"שווארמה פלאפל",lat:32.016,lon:34.779,rating:4.5},
+{name:"שווארמה גריל",lat:32.015,lon:34.78,rating:4.7},
+{name:"שווארמה אקספרס",lat:32.014,lon:34.781,rating:4.6},
+{name:"שווארמה הבית",lat:32.013,lon:34.782,rating:4.8},
+{name:"שווארמה קלאב",lat:32.012,lon:34.783,rating:4.5},
+{name:"שווארמה בום",lat:32.011,lon:34.784,rating:4.7},
+{name:"שווארמה פלוס",lat:32.01,lon:34.785,rating:4.6},
+{name:"שווארמה דרים",lat:32.009,lon:34.786,rating:4.8},
+{name:"שווארמה המלך",lat:32.008,lon:34.787,rating:4.9},
+{name:"שווארמה סטאר",lat:32.007,lon:34.788,rating:4.5},
+{name:"שווארמה שף",lat:32.006,lon:34.789,rating:4.7},
+{name:"שווארמה וייב",lat:32.005,lon:34.79,rating:4.6},
+{name:"שווארמה גורמה",lat:32.004,lon:34.791,rating:4.8},
+{name:"שווארמה טאון",lat:32.003,lon:34.792,rating:4.5},
+{name:"שווארמה XL",lat:32.002,lon:34.793,rating:4.7},
+{name:"שווארמה העיר העתיקה",lat:32.001,lon:34.794,rating:4.6},
+{name:"שווארמה סיטי",lat:32.022,lon:34.781,rating:4.8},
+{name:"שווארמה מרכז",lat:32.023,lon:34.782,rating:4.7},
+{name:"שווארמה שוק",lat:32.024,lon:34.783,rating:4.6},
+{name:"שווארמה פאן",lat:32.025,lon:34.784,rating:4.5},
+{name:"שווארמה פרש",lat:32.026,lon:34.785,rating:4.8},
+{name:"שווארמה על האש",lat:32.027,lon:34.786,rating:4.9}
+],
+
+
+pasta:[
+{name:"פסטה רומא",lat:32.014,lon:34.779,rating:4.7},
+{name:"לה פסטה איטליה",lat:32.019,lon:34.781,rating:4.8},
+{name:"פסטה בלה",lat:32.016,lon:34.777,rating:4.6},
+{name:"טוסקנה",lat:32.018,lon:34.782,rating:4.7},
+{name:"פסטה גורמה",lat:32.02,lon:34.78,rating:4.9},
+{name:"פסטה מילאנו",lat:32.021,lon:34.781,rating:4.8},
+{name:"פסטה הבית",lat:32.022,lon:34.782,rating:4.7},
+{name:"פסטה בר",lat:32.023,lon:34.783,rating:4.6},
+{name:"פסטה סיטי",lat:32.024,lon:34.784,rating:4.5},
+{name:"פסטה שף",lat:32.025,lon:34.785,rating:4.9},
+{name:"פסטה אקספרס",lat:32.026,lon:34.786,rating:4.6},
+{name:"פסטה פאן",lat:32.027,lon:34.787,rating:4.7},
+{name:"פסטה וייב",lat:32.028,lon:34.788,rating:4.8},
+{name:"פסטה קלאב",lat:32.029,lon:34.789,rating:4.5},
+{name:"פסטה סטאר",lat:32.03,lon:34.79,rating:4.7},
+{name:"פסטה XL",lat:32.011,lon:34.778,rating:4.8},
+{name:"פסטה דלוקס",lat:32.012,lon:34.777,rating:4.6},
+{name:"פסטה איטליאנו",lat:32.013,lon:34.776,rating:4.7},
+{name:"פסטה פיצה",lat:32.014,lon:34.775,rating:4.5},
+{name:"פסטה העיר",lat:32.015,lon:34.774,rating:4.8},
+{name:"פסטה פלוס",lat:32.016,lon:34.773,rating:4.9},
+{name:"פסטה דרים",lat:32.017,lon:34.772,rating:4.7},
+{name:"פסטה ניו יורק",lat:32.018,lon:34.771,rating:4.6},
+{name:"פסטה סופר",lat:32.019,lon:34.77,rating:4.5},
+{name:"פסטה רויאל",lat:32.02,lon:34.769,rating:4.8},
+{name:"פסטה ביסטרו",lat:32.021,lon:34.768,rating:4.7},
+{name:"פסטה פרימיום",lat:32.022,lon:34.767,rating:4.6},
+{name:"פסטה גורמה פלוס",lat:32.023,lon:34.766,rating:4.9},
+{name:"פסטה מאסטר",lat:32.024,lon:34.765,rating:4.8},
+{name:"פסטה טיים",lat:32.025,lon:34.764,rating:4.7}
+]
+
+
+};
+
+
+let currentType="";
+
+
+/* 🎯 בחירת סוג */
+function setType(type){
+currentType=type;
+render();
+}
+
+
+/* 📏 מרחק */
+function distance(a,b,c,d){
+let R=6371;
+let dLat=(c-a)*Math.PI/180;
+let dLon=(d-b)*Math.PI/180;
+
+
+let x=
+Math.sin(dLat/2)**2 +
+Math.cos(a*Math.PI/180)*
+Math.cos(c*Math.PI/180)*
+Math.sin(dLon/2)**2;
+
+
+return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+
+/* 🔥 רינדור */
+function render(){
+
+
+let list=[];
+
+
+/* קטגוריה */
+if(!currentType){
+for(let k in allData){
+list.push(...allData[k]);
+}
+}else{
+list=allData[currentType];
+}
+
+
+/* חיפוש */
+let s=document.getElementById("search").value;
+if(s){
+list=list.filter(r=>r.name.includes(s));
+}
+
+
+/* 10 ק״מ */
+list=list.filter(r=>distance(userLat,userLon,r.lat,r.lon)<=10);
+
+
+/* מיון */
+list.sort((a,b)=>
+distance(userLat,userLon,a.lat,a.lon) -
+distance(userLat,userLon,b.lat,b.lon)
+);
+
+
+document.getElementById("list").innerHTML="";
+
+
+list.forEach(r=>{
+
+
+let d=distance(userLat,userLon,r.lat,r.lon).toFixed(1);
+
+
+let div=document.createElement("div");
+div.className="card";
+
+
+div.innerHTML=`
+<img class="img" src="https://source.unsplash.com/800x400/?food">
+<div class="content">
+
+
+<div class="name">${r.name}</div>
+
+
+<div class="row">
+<div>⭐ ${r.rating}</div>
+<div>📍 ${d} ק״מ</div>
+</div>
+
+
+<span class="badge">✡️ כשר</span>
+<span class="badge">🟢 פתוח</span>
+
+
+<div class="small">עד 10 ק״מ ממך</div>
+
+
+<div class="btns">
+
+
+<a target="_blank" href="https://waze.com/ul?ll=${r.lat},${r.lon}&navigate=yes">
+<button class="waze">🚗 Waze</button>
+</a>
+
+
+<a target="_blank" href="https://www.google.com/search?q=${r.name}+כשרות">
+<button class="google">🔎 בדיקה</button>
+</a>
+
+
+</div>
+
+
+</div>
+`;
+
+
+document.getElementById("list").appendChild(div);
+
+
+});
+
+
+}
+
+
+render();
+
+
+</script>
+
+
+</body>
+</html>
+
+
+
+
+
+
+ 
+
